@@ -1,0 +1,164 @@
+# CSV to Tab delimited TXT file conversion and CSV file merge Python Script
+import pandas as pd
+import os
+import glob
+import logging
+from paramiko import SSHClient
+from scp import SCPClient
+
+# !pip install scp - Must have scp package installed in system
+
+# Set Source 
+os.chdir("C:\\Users\\sweta\\OneDrive\\Desktop")
+# File extension format
+extension = ['csv','txt', 'xml']
+rtnsts = 0
+# Current Date
+today = date.today()
+
+# To log the exception
+logging.basicConfig(filename='Joblog.log', level=logging.DEBUG, 
+                    format='%(asctime)s %(levelname)s %(name)s %(message)s')
+logger=logging.getLogger(__name__)
+
+# Set Reomte connection setup 
+# ssh = SSHClient()
+# ssh.load_system_host_keys()
+# ssh.connect('user@server:path')
+
+# ssh = SSHClient() 
+# ssh.load_host_keys(os.path.expanduser(os.path.join("~", ".ssh", "known_hosts")))
+# ssh.connect(server, username=username, password=password)
+
+
+def csv2txt(rtnsts):  # CSV file to tab separated txt file conversion function
+    
+    try:        
+    
+        # List all CSV files present in the Directory
+        all_csv_filenames = [i for i in glob.glob('*-part*.{}'.format(extension[0]))]
+
+        n = 1
+        for f in all_csv_filenames: # Read all CSV files in a loop
+            # Convert CSV files to Tab Separated txt files
+            pd.read_csv(f'{f}').to_csv(f'sample_report{n}.txt', sep='\t', index=False, header=True)
+            n = n + 1
+
+        # If the output file(sample_report.txt) exists, delete it.
+        if os.path.isfile('sample_report.txt'):
+            os.remove('sample_report.txt')
+    
+        # List of txt files
+        all_txt_filenames = [i for i in glob.glob('*sample_report*.{}'.format(extension[1]))]
+
+        #combine all txt files in the list to a single txt file
+        combined_txt = pd.concat([pd.read_csv(f) for f in all_txt_filenames ])
+        #export to txt file of sample_part.txt
+        combined_txt.to_csv( "sample_report.txt", index=False)
+        return 0
+    
+    except Exception as e:
+        print("Error: ", e.__class__, "occurred.")
+        logger.error(e)
+        return 1
+
+
+def csvmerge(rtnsts): # CSV file merge function
+    
+    try: 
+    
+        # If the output file(sample_report.csv) exists, delete it.
+        if os.path.isfile('sample_report.csv'):
+            os.remove('sample_report.csv')
+            
+        # List all CSV files present in the Directory
+        all_csv_filenames = [i for i in glob.glob('*-part*.{}'.format(extension[0]))]
+        
+        #combine all files in the list
+        combined_csv = pd.concat([pd.read_csv(f) for f in all_csv_filenames])
+       
+        #export to csv
+        combined_csv.to_csv( "sample_report.csv", index=False)
+        return 0
+    
+    except Exception as e:
+        print("Error: ", e.__class__, "occurred.")
+        logger.error(e)
+        return 1
+
+def filedlt(rtnsts):   
+    try:    
+        # If the output file(sample_report.csv) exists, delete it.
+        
+        # Delete all .PSD files in the directory
+        pattern= r"*.psd"
+        for file in glob.iglob(pattern, recursive=True):
+            os.remove(file)
+            
+        # Delete all .mht files in the directory    
+        pattern= r"*.mht"
+        for file in glob.iglob(pattern, recursive=True):     
+            os.remove(file)
+            
+        return 0
+    
+    except Exception as e:
+        print("Error: ", e.__class__, "occurred.")
+        logger.error(e)
+        return 1
+
+def sndfile(rtnsts):
+    try:
+        
+        with SCPClient(ssh.get_transport()) as scp:
+            scp.put('sample_report.csv', 'sample_report.txt') # Copy my_file.txt to the server
+        return 0
+    
+    except Exception as e: 
+        print("Error: ", e.__class__, "occurred.")   
+        logger.error(e)
+        return 1  
+    
+    finally:
+        sftp.close()
+        ssh.close()
+        
+    
+def dltoldfiles(rtnsts):
+    try:
+        
+        for filename in os.listdir(os.getcwd()):
+            path = os.path.join(os.getcwd(), filename)
+        
+            if date.fromtimestamp(os.stat(path).st_mtime) == today:
+    
+                if os.path.isfile(path):
+                    print(path + ' ' + str(os.stat(path).st_mtime))
+                    #os.remove(path)
+        return 0           
+    except Exception as e: 
+        print("Error: ", e.__class__, "occurred.")   
+        logger.error(e)
+        return 1        
+    
+if __name__ == "__main__":
+    
+    rtnsts = csv2txt(0)
+
+    # check rtnsts value. 0 - Successful, 1 - Error
+    
+    if rtnsts == 0:
+        #execute merge CSV function 
+        rtnsts = csvmerge(0)
+        
+        # Execute filedlt function only on successful execution of csvmerge function
+        if rtnsts == 0:
+            rtnsts = filedlt(0)
+            
+            # Send files to remote server
+            if rtnsts == 0:
+                sndfile(0)
+                
+            # Delete all older files (except todays file)
+                if rtnsts == 0:
+                    dltoldfiles(0)
